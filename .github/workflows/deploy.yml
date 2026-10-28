@@ -1,17 +1,53 @@
+name: Deploy HubSpot theme
+
 on:
   push:
     branches:
-    - main
+      - main
+    paths:
+      - 'src/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hubspot-themehub-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v2.3.3
-      - name: HubSpot Deploy Action
-        uses: HubSpot/hubspot-cms-deploy-action@v1.5
+        uses: actions/checkout@v4
+
+      - name: Check HubSpot configuration
+        shell: bash
+        env:
+          HUBSPOT_ACCOUNT_ID: ${{ vars.HUBSPOT_ACCOUNT_ID }}
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+        run: |
+          if [ -z "$HUBSPOT_ACCOUNT_ID" ]; then
+            echo "::error::Add the repository variable HUBSPOT_ACCOUNT_ID in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ "$HUBSPOT_ACCOUNT_ID" != "4316998" ]; then
+            echo "::error::Unexpected HubSpot account. This workflow is configured for account 4316998."
+            exit 1
+          fi
+          if [ -z "$HUBSPOT_PERSONAL_ACCESS_KEY" ]; then
+            echo "::error::Add the repository secret HUBSPOT_PERSONAL_ACCESS_KEY in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Deploy theme to HubSpot
+        uses: HubSpot/hubspot-cms-deploy-action@v2.0.1
         with:
           src_dir: src
-          dest_dir: cms-theme-boilerplate
-          portal_id: ${{ secrets.hubspot_portal_id }}
-          personal_access_key: ${{ secrets.hubspot_personal_access_key }}
+          dest_dir: themehub
+          account_id: ${{ vars.HUBSPOT_ACCOUNT_ID }}
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
